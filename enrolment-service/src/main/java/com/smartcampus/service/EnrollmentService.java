@@ -3,6 +3,8 @@ package com.smartcampus.service;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -18,15 +20,18 @@ public class EnrollmentService {
     @Autowired
     private RestTemplate restTemplate;
 
+    // =========================
+    // R4: CALL STUDENT SERVICE
+    // =========================
     public boolean checkStudentExists(String studentNumber) {
 
         String url = "http://localhost:8081/students";
 
         try {
-
             System.out.println("📡 CALLING STUDENT SERVICE...");
 
-            Object[] students = restTemplate.getForObject(url, Object[].class);
+            Object[] students =
+                restTemplate.getForObject(url, Object[].class);
 
             if (students == null) {
                 System.out.println("❌ NULL RESPONSE");
@@ -35,56 +40,72 @@ public class EnrollmentService {
 
             for (Object s : students) {
                 if (s.toString().contains(studentNumber)) {
+                    System.out.println("✅ STUDENT FOUND");
                     return true;
                 }
             }
 
+            System.out.println("❌ STUDENT NOT FOUND");
             return false;
 
         } catch (Exception e) {
 
-            // 🔥 R9 FAILURE HANDLING
             System.out.println("⚠ STUDENT SERVICE DOWN!");
 
-            System.out.println("🔁 FALLBACK: allowing request with limited validation");
-
-            return false; // OR true depending strategy
+            // R9: FAILURE HANDLING (graceful)
+            // IMPORTANT: do NOT crash API
+            return false;
         }
     }
-    public Enrollment save(Enrollment e) {
 
-        System.out.println("🔵 START R4 CHECK");
+    // =========================
+    // CREATE ENROLMENT (R4 + R6)
+    // =========================
+    public ResponseEntity<?> save(Enrollment e) {
+
+        System.out.println("🔵 START ENROLMENT PROCESS");
 
         boolean exists = checkStudentExists(e.getStudentNumber());
 
         System.out.println("🟡 STUDENT EXISTS? = " + exists);
-        
+
+        // =========================
+        // VALIDATION FAIL
+        // =========================
         if (!exists) {
+            System.out.println("❌ BLOCKED - INVALID STUDENT");
 
-            System.out.println("⚠ WARNING: Student service unavailable or student not found");
-
-            // 🔥 GRACEFUL DEGRADATION (R9 MARKS)
-            return repo.save(e);
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Student not found or Student Service unavailable");
         }
 
-        System.out.println("🟢 ALLOWED - saving enrolment");
-
+        // =========================
+        // SAVE TO DB
+        // =========================
         Enrollment saved = repo.save(e);
 
-        // 🔥 R6 - NOTIFICATION CALL (ADD HERE)
-        restTemplate.postForObject(
-            "http://localhost:8080/notify",
-            "Student " + e.getStudentNumber()
-            + " enrolled in " + e.getCourseCode(),
-            String.class
-        );
+        System.out.println("💾 ENROLMENT SAVED");
 
-        System.out.println("📨 NOTIFICATION SENT");
+        // =========================
+        // R6 - NOTIFICATION (TCP)
+        // =========================
+        try {
+            NotificationClient.sendNotification(
+                "Student enrolled successfully: " + e.getStudentNumber()
+            );
+        } catch (Exception ex) {
+            System.out.println("⚠ Notification failed but enrolment still saved");
+        }
 
-        return saved;
+        System.out.println("🟢 ENROLMENT COMPLETE");
+
+        return ResponseEntity.ok(saved);
     }
-    
 
+    // =========================
+    // GET ALL
+    // =========================
     public List<Enrollment> getAll() {
         return repo.findAll();
     }

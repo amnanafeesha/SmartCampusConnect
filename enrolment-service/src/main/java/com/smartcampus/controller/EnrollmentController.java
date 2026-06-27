@@ -3,6 +3,7 @@ package com.smartcampus.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.smartcampus.entity.Enrollment;
@@ -20,8 +21,9 @@ public class EnrollmentController {
         return service.getAll();
     }
 
+    // 🔥 FIX HERE (IMPORTANT)
     @PostMapping
-    public Enrollment add(@RequestBody Enrollment e) {
+    public ResponseEntity<?> add(@RequestBody Enrollment e) {
         return service.save(e);
     }
 }
