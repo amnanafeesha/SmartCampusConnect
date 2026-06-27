@@ -18,4 +18,8 @@ public class LibraryEndpoint {
         // SIMPLE VERSION (for assignment demo)
         return service.borrowBook("B001", "A1001");
     }
+    
+    if(request == null || request.isBlank()) {
+        throw new RuntimeException("Invalid borrow request");
+    }
 }
