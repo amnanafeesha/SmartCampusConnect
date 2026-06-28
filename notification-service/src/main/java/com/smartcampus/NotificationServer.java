@@ -4,12 +4,19 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class NotificationServer {
+
+    private static final List<String> notifications =
+            Collections.synchronizedList(new ArrayList<>());
 
     public static void main(String[] args) {
 
         int port = 5000;
+
+        ExecutorService pool = Executors.newFixedThreadPool(5);
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
 
@@ -19,19 +26,39 @@ public class NotificationServer {
 
                 Socket socket = serverSocket.accept();
 
-                BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream())
-                );
+                pool.execute(() -> {
 
-                String message = reader.readLine();
+                    try {
 
-                System.out.println("📩 Notification Received: " + message);
+                        BufferedReader reader = new BufferedReader(
+                                new InputStreamReader(socket.getInputStream())
+                        );
 
-                socket.close();
+                        String message = reader.readLine();
+
+                        notifications.add(message);
+
+                        System.out.println(
+                                Thread.currentThread().getName()
+                                + " -> "
+                                + message
+                        );
+
+                        socket.close();
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                });
+
             }
 
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        pool.shutdown();
+
     }
 }
